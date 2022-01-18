@@ -1,0 +1,6 @@
+SELECT CASE WHEN rrf.snaid IS NOT NULL THEN 'Paid' ELSE 'No Payments' END, COUNT(distinct sd.snaid)
+FROM fin_met_frozen.archive_2021_12.subscription_dates sd
+         LEFT JOIN fin_met_frozen.archive_2021_12.rrf_combo rrf ON rrf.snaid = sd.snaid AND rrf.brand_id = '6001'
+WHERE CAST('2021-12-31' AS DATE) BETWEEN sub_1st_date and sub_last_date
+  AND affiliate_id = '6000'
+GROUP BY 1
