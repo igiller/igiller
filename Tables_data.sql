@@ -46,3 +46,6 @@ select *
 from ft_prod.ZUORA_PMT.VW_SUBSCRIPTIONS_TO_INVOICES
 where ORIGINAL_SUBSCRIPTION_ID = '2c92a00c6f9ddb76016fa6bc26b03200'
 ;
+
+select count(*) from FIN_MET_LIVE.derived.subscription_dates
+where SUB_LAST_DATE='2022-01-31'
