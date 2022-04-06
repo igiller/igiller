@@ -9,10 +9,10 @@ WITH churn_daily AS (with period as (
           from (
                    select distinct MONTH_END_DATE::date                         as report_date,
                                    MONTH_BEGIN_DATE::date                       as report_month_start,
-                                   min(add_months(MONTH_BEGIN_DATE, -11)::date) as trailing_start
+                                min(add_months(MONTH_BEGIN_DATE, -11)::date) as trailing_start
                    from prod_dw.dim.DATE_DIM
-                   where report_month_start>= date_trunc(months, DATEADD(DAY, -1, current_date))
-                     and MONTH_END_DATE <= dateadd(month, 1, date_trunc(month, DATEADD(DAY, -1, current_date)))
+                   where report_month_start>= date_trunc(months, DATEADD(DAY, -8, current_date))
+                     and MONTH_END_DATE <= dateadd(month, 1, date_trunc(month, DATEADD(DAY, -8, current_date)))
                    group by 1,2
                ) A
 
@@ -28,7 +28,7 @@ WITH churn_daily AS (with period as (
 
       active_snaids_period_start as (
           select distinct p.AFFILIATE_ID, p.report_date, duration, sd.snaid, max(NTA_DATE) NT_DATE
-          from FIN_MET_LIVE.derived.subscription_dates sd
+          from FIN_MET_LIVE.DERIVED.subscription_dates sd
                   inner join PROD_DW.dim.BRAND_LOOKUP bl
                       on bl.BRAND_ID = sd.BRAND_ID
 
@@ -37,7 +37,7 @@ WITH churn_daily AS (with period as (
                       and p.AFFILIATE_ID = sd.AFFILIATE_ID
                       and report_date >= bl.SA_ACQUISITION_DATE
 
-                  left join FIN_MET_LIVE.derived.FIN_MET_NTA_TRANSACTIONS nta
+                  left join FIN_MET_LIVE.DERIVED.FIN_MET_NTA_TRANSACTIONS nta
                     on nta.SNAID=sd.SNAID and nta.AFFILIATE_ID=sd.AFFILIATE_ID
 
           where p.AFFILIATE_ID <> 0
@@ -46,14 +46,14 @@ WITH churn_daily AS (with period as (
           union all
 
           select distinct 0 as affiliate_id, p.report_date, duration, sd.snaid, max(NTH_DATE) NT_DATE
-          from FIN_MET_LIVE.derived.subscription_dates sd
+          from FIN_MET_LIVE.DERIVED.subscription_dates sd
                    inner join PROD_DW.dim.BRAND_LOOKUP bl
                       on bl.BRAND_ID = sd.BRAND_ID
                    inner join period p
                               on start_date between sd.sub_1st_date and sd.sub_last_date
                               and start_date >= bl.SA_ACQUISITION_DATE
 
-                            left join FIN_MET_LIVE.derived.FIN_MET_NTH_TRANSACTIONS nth
+                            left join FIN_MET_LIVE.DERIVED.FIN_MET_NTH_TRANSACTIONS nth
                     on nth.SNAID=sd.SNAID
           GROUP BY 1,2,3,4
 
@@ -61,12 +61,12 @@ WITH churn_daily AS (with period as (
 
       active_snaids_period_end as (
           select distinct p.AFFILIATE_ID, p.report_date, p.duration, sd.snaid
-          from FIN_MET_LIVE.derived.subscription_dates sd
+          from FIN_MET_LIVE.DERIVED.subscription_dates sd
                   inner join PROD_DW.dim.BRAND_LOOKUP bl
                       on bl.BRAND_ID = sd.BRAND_ID
 
                   inner join period p
-                      on current_date between sd.sub_1st_date and sd.sub_last_date
+                      on DATEADD(DAY, 1, report_date) between sd.sub_1st_date and sd.sub_last_date
                       and p.AFFILIATE_ID = sd.AFFILIATE_ID
                       and report_date >= bl.SA_ACQUISITION_DATE
 
@@ -76,18 +76,18 @@ WITH churn_daily AS (with period as (
           union all
 
           select distinct 0 as affiliate_id, p.report_date, duration, sd.snaid
-          from FIN_MET_LIVE.derived.subscription_dates sd
+          from FIN_MET_LIVE.DERIVED.subscription_dates sd
                    inner join PROD_DW.dim.BRAND_LOOKUP bl
                       on bl.BRAND_ID = sd.BRAND_ID
                    inner join period p
-                              on current_date between sd.sub_1st_date and sd.sub_last_date
+                              on DATEADD(DAY, 1, report_date) between sd.sub_1st_date and sd.sub_last_date
                               and report_date >= bl.SA_ACQUISITION_DATE
       ),
 
 
       nta_in_period as (
           select distinct p.AFFILIATE_ID, p.report_date, p.duration, nta.snaid, max(NTA_DATE) NT_DATE
-          from FIN_MET_LIVE.derived.FIN_MET_NTA_TRANSACTIONS nta
+          from FIN_MET_LIVE.DERIVED.FIN_MET_NTA_TRANSACTIONS nta
                   inner join period p
                       on nta.NTA_DATE between p.start_date and p.report_date
                       and p.AFFILIATE_ID = nta.AFFILIATE_ID
@@ -97,7 +97,7 @@ WITH churn_daily AS (with period as (
           union all
 
           select distinct p.AFFILIATE_ID, p.report_date, p.duration, nth.snaid, max(NTH_DATE) NT_DATE
-          from FIN_MET_LIVE.derived.FIN_MET_NTH_TRANSACTIONS nth
+          from FIN_MET_LIVE.DERIVED.FIN_MET_NTH_TRANSACTIONS nth
                   inner join period p
                       on nth.NTH_DATE between p.start_date and p.report_date
           where p.AFFILIATE_ID = 0
@@ -127,10 +127,10 @@ WITH churn_daily AS (with period as (
              cs.segment,
              NT_Date,
             CASE WHEN NT_DATE is null then 'Unknown'
-                WHEN TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) <= 1 then '1 months'
-                  WHEN TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) >1 and TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) <= 12 then '2-12 months'
-                  WHEN TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) > 12 and TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) <= 24 then '1-2 years'
-                  WHEN TRUNC(months_between(DATEADD(DAY, -1, current_date),NT_DATE)) > 24 then 'over 2 years'
+                WHEN TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) <= 1 then '1 months'
+                  WHEN TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) >1 and TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) <= 12 then '2-12 months'
+                  WHEN TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) > 12 and TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) <= 24 then '1-2 years'
+                  WHEN TRUNC(months_between(DATEADD(DAY, -8, current_date),NT_DATE)) > 24 then 'over 2 years'
                     ELSE NULL END NT_age,
              sd.original_subscription_id,
              sd.sub_last_date,
@@ -143,14 +143,14 @@ WITH churn_daily AS (with period as (
              cd.campaign_name
       FROM churned_snaids cs
       LEFT JOIN (SELECT sd.snaid, sd.original_subscription_id, ll.affiliate_id, sd.sub_last_date
-                 FROM FIN_MET_LIVE.derived.subscription_dates sd
+                 FROM FIN_MET_LIVE.DERIVED.subscription_dates sd
                  JOIN (SELECT sd.snaid, sd.affiliate_id, MAX(sub_last_date) last_date
-                            FROM FIN_MET_LIVE.derived.subscription_dates sd
+                            FROM FIN_MET_LIVE.DERIVED.subscription_dates sd
                             INNER JOIN churned_snaids cs ON cs.snaid = sd.snaid AND cs.affiliate_id = sd.affiliate_id AND sd.sub_last_date <= cs.report_date
                             GROUP BY 1,2
                             UNION
                             SELECT sd.snaid, 0 as affiliate_id, MAX(sd.sub_last_date) last_date
-                            FROM FIN_MET_LIVE.derived.subscription_dates sd
+                            FROM FIN_MET_LIVE.DERIVED.subscription_dates sd
                             INNER JOIN churned_snaids cs ON cs.snaid = sd.snaid AND cs.affiliate_id = 0 AND sd.sub_last_date <= cs.report_date
                             GROUP BY 1,2
                          ) ll ON ll.snaid = sd.snaid and sd.sub_last_date = ll.last_date) sd ON cs.snaid = sd.snaid AND cs.affiliate_id = sd.affiliate_id
@@ -158,16 +158,15 @@ WITH churn_daily AS (with period as (
       LEFT JOIN prod_dw.dw.product_dim pd ON pd.publicationcode = sf.pubcode
       LEFT JOIN prod_dw.dw.effort_dim ed ON ed.effort_id = sf.effort_id
       LEFT JOIN prod_dw.dw.campaign_dim cd ON cd.campaign_id = ed.campaign_id
-      where SUB_LAST_DATE between date_trunc(months, DATEADD(DAY, -1, current_date)) and DATEADD(DAY, -1, current_date)
+      where SUB_LAST_DATE between date_trunc(months, DATEADD(DAY, -8, current_date)) and DATEADD(DAY, -8, current_date)
        )
 SELECT
-    churn_daily.NT_age  AS "churn_daily.NT_age",
-        (TO_CHAR(TO_DATE(churn_daily."SUB_LAST_DATE" ), 'YYYY-MM-DD')) AS "churn_daily.sub_last_date",
+    --churn_daily.NT_age  AS "churn_daily.NT_age",
+        TO_CHAR(TO_DATE(churn_daily."SUB_LAST_DATE"), 'YYYY-MM-DD') AS "churn_daily.sub_last_date",
     COUNT(DISTINCT (churn_daily."SNAID")) AS count_of_snaid
 FROM churn_daily
 where AFFILIATE_ID=0
 GROUP BY
-    (TO_DATE(churn_daily."SUB_LAST_DATE" )),
-    1
+    TO_CHAR(TO_DATE(churn_daily."SUB_LAST_DATE"), 'YYYY-MM-DD')
 ORDER BY
     1
